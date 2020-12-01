@@ -11,6 +11,8 @@ param (
 
 # To Do:
 # * Add progressbar depending on finished/remaining backgroundtasks
+
+# * Multithreading: Measure-Command { Get-InstalledModule | Start-RSJob -ScriptBlock { $_ | Get-LatestModuleVersion } -Throttle ([System.Environment]::ProcessorCount) -FunctionsToImport Get-LatestModuleVersion | Wait-RSJob | Receive-RSJob }
 function Get-LatestModuleVersion
 {
     #Requires -Module PoshRsJob
@@ -19,26 +21,29 @@ function Get-LatestModuleVersion
     [CmdletBinding()]
     param (
         # Name of module to get versions from
+        [ValidateNotNullOrEmpty()]
         [Parameter(
             Mandatory = $true,
             Position = 1,
-            ValueFromPipelineByPropertyName = $true
+            ValueFromPipelineByPropertyName = $true,
+            ValueFromPipeline = $true
         )]
         [String] $Name,
 
         # Look up latest module version in online repositories
-        [Parameter()]
+        [Parameter(ParameterSetName = "Online")]
         [Switch] $Online,
 
         # Check module if update is available
-        [Parameter()]
+        [Parameter(ParameterSetName = "Online")]
         [Switch] $CheckUpdate,
 
         # Perform internet connection check
-        [Parameter()]
+        [Parameter(ParameterSetName = "Online")]
         [Switch] $CheckConnection,
 
         # Internet domain to check internet connection
+        [Parameter(ParameterSetName = "Online")]
         [ValidateNotNullOrEmpty()]
         [String] $TargetName = "google.com"
     )
@@ -47,6 +52,7 @@ function Get-LatestModuleVersion
     {
         Write-Verbose "$($MyInvocation.MyCommand) - beginn block"
         $ObjectProperties = @("Name", "Version", "Source", "Update", "Type")
+        $InternetConnection = $true
     }
 
     process
@@ -54,12 +60,7 @@ function Get-LatestModuleVersion
         if ($CheckConnection -And ($CheckUpdate -Or $Online) )
         {
             Write-Verbose "Checking internet connection"
-            if (Test-Connection -ComputerName $TargetName -Quiet)
-            { 
-                Write-Verbose "Internet connection detected"
-                $InternetConnection = $true 
-            }
-            else
+            if (-Not (Test-Connection -ComputerName $TargetName -Quiet) )
             { 
                 Write-Verbose "Can not detect internet connection"
                 Write-Verbose "Maybe $TargetName did not answer ping request."
@@ -76,7 +77,7 @@ function Get-LatestModuleVersion
             $Mod.Update = $false
         }
 
-        if (-Not $CheckConnection -Or $InternetConnection)
+        if ($InternetConnection -And ($CheckUpdate -Or $Online) ) # this is wrong
         {
             $ModOnline = Find-Module -Name $Name | Select-Object -Property $ObjectProperties 
             if ($CheckUpdate)
