@@ -130,3 +130,67 @@ function Get-DomainLinks ()
         }        
     }
 }
+
+
+function Rename-ContentWithRegEx ()
+{
+    [CmdletBinding()]
+    param (
+        # Path to file
+        [Parameter(Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]
+        [ValidateScript(
+            {
+                if (Test-Path -Path $_ -Type Leaf)
+                {
+                    return $true
+                }
+                else
+                {
+                    throw "Provided file doesn't exists."
+                }
+            }
+        )]
+        [String]
+        $Path,
+
+        # Destination file with all found regex matches
+        [Parameter()]
+        [ValidateNotNullOrEmpty()]
+        [ValidateScript(
+            {
+                if (Test-Path -Path $_ -IsValid -PathType Leaf)
+                {
+                    if (Test-Path -Path $_)
+                    {
+                        Write-Verbose "Move $($_) to $($_ + ".bak")"
+                        $_ | Move-Item -Destination ($_ + ".bak")
+                    }
+                    Write-Verbose "Create file $($_)"
+                    New-Item -Path $_ -ItemType File > $null
+                }
+                else
+                {
+                    throw "Provided argument doesn't seems to be a valid leaf."
+                }
+                return $true
+            }
+        )]
+        [String]
+        $Destination,
+
+        # Hashtable with regex and replace value
+        [Parameter(Mandatory = $true)]
+        [hashtable]
+        $Replace
+    )
+
+    (Get-Content -Path $Path -Raw) | ForEach-Object {
+        $content = $_
+        $Replace.GetEnumerator() | ForEach-Object {
+            $content -replace $_.Name, $_.Value
+        }
+    } | Set-Content -Path $Destination
+    
+
+}
