@@ -1,5 +1,5 @@
 
-function Get-DomainLinks ()
+function Get-DomainLinks
 {
     <#
     .SYNOPSIS
@@ -132,8 +132,37 @@ function Get-DomainLinks ()
 }
 
 
-function Rename-ContentWithRegEx ()
+function Rename-ContentWithRegEx
 {
+    <#
+    .SYNOPSIS
+    The `Rename-ContentWithRegEx` replaces regex filtered string within a file.
+    
+    .DESCRIPTION
+    The `Rename-ContentWithRegEx` cmdlet accepts a hashtable with regex keys and the replace value as value of the regex key.
+    You can replace multiple stings and filter with multiple regexs.
+    
+    .PARAMETER Path
+    The path to the target file you want to replace strings in.
+    
+    .PARAMETER Destination
+    The path to the new file with the replaced strings.
+    
+    .PARAMETER Replace
+    The hashtable with regex keys and replace stings as value. eg. @{'http.?:\/\/.*?\.org' = 'https://example.org'}
+    
+    .EXAMPLE
+    Rename-ContentWithRegEx -Path ~\Downloads\db-dump.sql -Destination ~\Downloads\new-db-dump.sql -Replace @{'http.?:\/\/.*?\.org' = 'https://example.org'}
+
+    Description
+    -----------
+    Replace all weblinks on top level domain .org with https://example.org
+
+    .NOTES
+    The original reason for creating this cmdlet was to replace links on a database dump with the new webserver url.
+    This cmdlet loads whole file content into memory while replacements.
+    
+    #>
     [CmdletBinding()]
     param (
         # Path to file
@@ -184,13 +213,15 @@ function Rename-ContentWithRegEx ()
         [hashtable]
         $Replace
     )
-
-    (Get-Content -Path $Path -Raw) | ForEach-Object {
-        $content = $_
-        $Replace.GetEnumerator() | ForEach-Object {
-            $content -replace $_.Name, $_.Value
-        }
-    } | Set-Content -Path $Destination
     
-
+    Write-Verbose "Load raw file content into memory"
+    $content = (Get-Content -Path $Path -Raw) 
+    foreach ($k in $Replace.Keys) {
+        Write-Verbose "replace $k with $($Replace[$k])"
+        $content = $content -replace $k, $Replace[$k]
+    }
+    Write-Verbose "Write new content to file $Destination"
+    Set-Content -Path $Destination -Value $content
+    Write-Verbose "Run garbage collector"
+    [GC]::Collect()
 }
