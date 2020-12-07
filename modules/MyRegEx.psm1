@@ -93,11 +93,17 @@ function Get-DomainLinks
         [String[]]
         $Domains = @("sport-thieme.lan", "thieme.ad"),
 
-        # Parameter help description
+        # Pass objects to pipline 
         [Parameter()]
         [Switch]
-        $PassThru
+        $PassThru,
+
+        # Just print protocol and hostnames
+        [Parameter()]
+        [Switch]
+        $HostOnly
     )
+    $regex_array = [System.Collections.ArrayList]::new()
 
     foreach ($d in $Domains)
     {
@@ -106,7 +112,7 @@ function Get-DomainLinks
         $esc_domain = [Regex]::Escape($d)
         Write-Verbose "Add $esc_domain to regex collection"
         # add escaped domain regex to array
-        $regex_array += "http.?:\/\/(?:\w){0,25}\.$($esc_domain)(?:\/.*?\.(?:\w){3,4})?"
+        $regex_array.Add( "http.?:\/\/(?:\w){0,25}\.$($esc_domain)(?:\/.*?\.(?:\w){3,4})?" ) | Out-Null
     }
     #$regex = "http:\/\/osxap01\.sport-thieme\.lan.*?\.(?:\w){3,4}"
     # general regex collection for internal domain
