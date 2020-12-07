@@ -124,7 +124,12 @@ function Get-DomainLinks
     {
         Write-Verbose "Search $regex in $Path - results are saved in $Destination"
 
-        Select-String -Path $Path -Pattern $regex -AllMatches |  ForEach-Object { $_.Matches.Value } | Sort-Object -Unique | ForEach-Object {
+        Select-String -Path $Path -Pattern $regex -AllMatches |  ForEach-Object { $_.Matches.Value } | ForEach-Object {
+            if ($HostOnly)
+            {
+                $_ | Select-String -Pattern "http.?:\/\/.*?\/" -AllMatches | ForEach-Object { $_.Matches.Value }
+            }
+        } | Sort-Object -Unique | ForEach-Object {
             if ($PassThru)
             {
                 return $_
