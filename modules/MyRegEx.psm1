@@ -101,7 +101,7 @@ function Get-DomainLinks
         # Just print protocol and hostnames
         [Parameter()]
         [Switch]
-        $HostOnly
+        $RootURL
     )
     $regex_array = [System.Collections.ArrayList]::new()
 
@@ -125,7 +125,7 @@ function Get-DomainLinks
         Write-Verbose "Search $regex in $Path - results are saved in $Destination"
 
         Select-String -Path $Path -Pattern $regex -AllMatches |  ForEach-Object { $_.Matches.Value } | ForEach-Object {
-            if ($HostOnly)
+            if ($RootURL)
             {
                 $_ | Select-String -Pattern "http.?:\/\/.*?\/" -AllMatches | ForEach-Object { $_.Matches.Value }
             }
