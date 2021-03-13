@@ -1,6 +1,5 @@
 
-function Get-DomainLinks
-{
+function Get-DomainLinks {
     <#
     .SYNOPSIS
     The `Get-DomainLinks` cmdlet collects all http links for the given domains in a new file.
@@ -50,12 +49,9 @@ function Get-DomainLinks
         [ValidateNotNullOrEmpty()]
         [ValidateScript(
             {
-                if (Test-Path -Path $_ -Type Leaf)
-                {
+                if (Test-Path -Path $_ -Type Leaf) {
                     return $true
-                }
-                else
-                {
+                } else {
                     throw "Provided file doesn't exists."
                 }
             }
@@ -68,18 +64,14 @@ function Get-DomainLinks
         [ValidateNotNullOrEmpty()]
         [ValidateScript(
             {
-                if (Test-Path -Path $_ -IsValid -PathType Leaf)
-                {
-                    if (Test-Path -Path $_)
-                    {
-                        Write-Verbose "Move $($_) to $($_ + ".bak")"
-                        $_ | Move-Item -Destination ($_ + ".bak")
+                if (Test-Path -Path $_ -IsValid -PathType Leaf) {
+                    if (Test-Path -Path $_) {
+                        Write-Verbose "Move $($_) to $($_ + '.bak')"
+                        $_ | Move-Item -Destination ($_ + '.bak')
                     }
                     Write-Verbose "Create file $($_)"
                     New-Item -Path $_ -ItemType File > $null
-                }
-                else
-                {
+                } else {
                     throw "Provided argument doesn't seems to be a valid leaf."
                 }
                 return $true
@@ -91,7 +83,7 @@ function Get-DomainLinks
         # List of domain names
         [Parameter()]
         [String[]]
-        $Domains = @("sport-thieme.lan", "thieme.ad"),
+        $Domains = @('sport-thieme.lan', 'thieme.ad'),
 
         # Pass objects to pipline 
         [Parameter()]
@@ -105,8 +97,7 @@ function Get-DomainLinks
     )
     $regex_array = [System.Collections.ArrayList]::new()
 
-    foreach ($d in $Domains)
-    {
+    foreach ($d in $Domains) {
         # escape each domain in array
         Write-Verbose "Escape domain $d"
         $esc_domain = [Regex]::Escape($d)
@@ -114,28 +105,18 @@ function Get-DomainLinks
         # add escaped domain regex to array
         $regex_array.Add( "http.?:\/\/(?:\w){0,25}\.$($esc_domain)(?:\/.*?\.(?:\w){3,4})?" ) | Out-Null
     }
-    #$regex = "http:\/\/osxap01\.sport-thieme\.lan.*?\.(?:\w){3,4}"
-    # general regex collection for internal domain
-    #$regex_array = @("http.?:\/\/(?:\w){0,25}\.sport-thieme.lan(?:\/.*?\.(?:\w){3,4})?", "http.?:\/\/(?:\w){0,25}\.thieme.ad(?:\/.*?\.(?:\w){3,4})?")
-    # regex collection without groupwise links
-    #$regex_array = @("http.?:\/\/(?:\w){0,25}\.sport-thieme.lan(?:(?:\/gw\/webacc)|(?:\/.*?\.(?:[A-Za-z]){3,4}))?", "http.?:\/\/(?:\w){0,25}\.thieme.ad(?:\/.*?\.(?:[A-Za-z]){3,4})?")
-
-    foreach ($regex in $regex_array)
-    {
+    
+    foreach ($regex in $regex_array) {
         Write-Verbose "Search $regex in $Path - results are saved in $Destination"
 
         Select-String -Path $Path -Pattern $regex -AllMatches |  ForEach-Object { $_.Matches.Value } | ForEach-Object {
-            if ($RootURL)
-            {
-                $_ | Select-String -Pattern "http.?:\/\/.*?\/" -AllMatches | ForEach-Object { $_.Matches.Value }
+            if ($RootURL) {
+                $_ | Select-String -Pattern 'http.?:\/\/.*?\/' -AllMatches | ForEach-Object { $_.Matches.Value }
             }
         } | Sort-Object -Unique | ForEach-Object {
-            if ($PassThru)
-            {
+            if ($PassThru) {
                 return $_
-            }
-            else
-            {
+            } else {
                 $_ >> $Destination
             }
         }        
@@ -143,8 +124,7 @@ function Get-DomainLinks
 }
 
 
-function Rename-ContentWithRegEx
-{
+function Rename-ContentWithRegEx {
     <#
     .SYNOPSIS
     The `Rename-ContentWithRegEx` replaces regex filtered string within a file.
@@ -181,12 +161,9 @@ function Rename-ContentWithRegEx
         [ValidateNotNullOrEmpty()]
         [ValidateScript(
             {
-                if (Test-Path -Path $_ -Type Leaf)
-                {
+                if (Test-Path -Path $_ -Type Leaf) {
                     return $true
-                }
-                else
-                {
+                } else {
                     throw "Provided file doesn't exists."
                 }
             }
@@ -199,18 +176,14 @@ function Rename-ContentWithRegEx
         [ValidateNotNullOrEmpty()]
         [ValidateScript(
             {
-                if (Test-Path -Path $_ -IsValid -PathType Leaf)
-                {
-                    if (Test-Path -Path $_)
-                    {
-                        Write-Verbose "Move $($_) to $($_ + ".bak")"
-                        $_ | Move-Item -Destination ($_ + ".bak")
+                if (Test-Path -Path $_ -IsValid -PathType Leaf) {
+                    if (Test-Path -Path $_) {
+                        Write-Verbose "Move $($_) to $($_ + '.bak')"
+                        $_ | Move-Item -Destination ($_ + '.bak')
                     }
                     Write-Verbose "Create file $($_)"
                     New-Item -Path $_ -ItemType File > $null
-                }
-                else
-                {
+                } else {
                     throw "Provided argument doesn't seems to be a valid leaf."
                 }
                 return $true
@@ -225,7 +198,7 @@ function Rename-ContentWithRegEx
         $Replace
     )
     
-    Write-Verbose "Load raw file content into memory"
+    Write-Verbose 'Load raw file content into memory'
     $content = (Get-Content -Path $Path -Raw) 
     foreach ($k in $Replace.Keys) {
         Write-Verbose "replace $k with $($Replace[$k])"
@@ -233,6 +206,6 @@ function Rename-ContentWithRegEx
     }
     Write-Verbose "Write new content to file $Destination"
     Set-Content -Path $Destination -Value $content
-    Write-Verbose "Run garbage collector"
+    Write-Verbose 'Run garbage collector'
     [GC]::Collect()
 }
