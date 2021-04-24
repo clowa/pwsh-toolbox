@@ -124,13 +124,13 @@ function Get-DomainLinks {
 }
 
 
-function Rename-ContentWithRegEx {
+function Rename-ContentByRegEx {
     <#
     .SYNOPSIS
-    The `Rename-ContentWithRegEx` replaces regex filtered string within a file.
+    The `Rename-ContentByRegEx` replaces regex filtered string within a file.
     
     .DESCRIPTION
-    The `Rename-ContentWithRegEx` cmdlet accepts a hashtable with regex keys and the replace value as value of the regex key.
+    The `Rename-ContentByRegEx` cmdlet accepts a hashtable with regex keys and the replace value as value of the regex key.
     You can replace multiple stings and filter with multiple regexs.
     
     .PARAMETER Path
@@ -143,7 +143,7 @@ function Rename-ContentWithRegEx {
     The hashtable with regex keys and replace stings as value. eg. @{'http.?:\/\/.*?\.org' = 'https://example.org'}
     
     .EXAMPLE
-    Rename-ContentWithRegEx -Path ~\Downloads\db-dump.sql -Destination ~\Downloads\new-db-dump.sql -Replace @{'http.?:\/\/.*?\.org' = 'https://example.org'}
+    Rename-ContentByRegEx -Path ~\Downloads\db-dump.sql -Destination ~\Downloads\new-db-dump.sql -Replace @{'http.?:\/\/.*?\.org' = 'https://example.org'}
 
     Description
     -----------
