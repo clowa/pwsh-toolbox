@@ -136,7 +136,7 @@ function Get-AWSSettings {
     AWS secret key of API user.
     
     .PARAMETER Region
-    AWS region to use. Defaults to configured default location
+    AWS region to use. Defaults to `us-east-1` or if present configured default location.
     
     .EXAMPLE
     Get-AWSSettings -AccessKey "MyAccessKey" -SecretKey "MySecretKey" -Region us-east-1
@@ -166,7 +166,13 @@ function Get-AWSSettings {
             }
         )]
         [System.String]
-        $Region = (Get-AWSRegion | Where-Object IsShellDefault -eq $true).Region
+        $Region = 'us-east-1'
     )
+    If ((Get-AWSRegion | Where-Object IsShellDefault -eq $true).Length -gt 0) {
+        Write-Verbose 'Found default region in AWS config.'
+        $Region = (Get-AWSRegion | Where-Object IsShellDefault -eq $true).Item(0).Region
+    }
+    Write-Verbose "Using AWS region $Region"
+
     return [AWSSettings]::new($AccessKey, $SecretKey, $Region)
 } 
