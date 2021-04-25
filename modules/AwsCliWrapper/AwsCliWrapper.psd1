@@ -9,7 +9,7 @@
 @{
 
 # Script module or binary module file associated with this manifest.
-# RootModule = ''
+RootModule = 'AwsCliWrapper.psm1'
 
 # Version number of this module.
 ModuleVersion = '0.0.1'
@@ -69,13 +69,13 @@ Description = 'Helper commandlets to install or uninstall AWSCLIv2.'
 # NestedModules = @()
 
 # Functions to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no functions to export.
-FunctionsToExport = @()
+FunctionsToExport = @(
+    'Install-AWSCLIV2',
+    'Uninstall-AWSCLIV2'
+)
 
 # Cmdlets to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no cmdlets to export.
-CmdletsToExport = @(
-    "Install-AWSCLIV2",
-    "Uninstall-AWSCLIV2"
-)
+CmdletsToExport = @()
 
 # Variables to export from this module
 VariablesToExport = '*'
