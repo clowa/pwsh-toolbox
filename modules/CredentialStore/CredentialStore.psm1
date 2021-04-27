@@ -1,3 +1,5 @@
+#using System.Management.Automation
+
 # create password file if it isn't present yet
 function Export-Credentials {
     <#
@@ -23,9 +25,9 @@ function Export-Credentials {
     #>
     param(
         # input credential object
-        [Parameter(Mandatory)]
+        [Parameter(Mandatory, ValueFromPipeline)]
         [ValidateNotNullOrEmpty()]
-        [System.Management.Automation.PSCredential]
+        [PSCredential]
         $Credential,
 
         # path to store credentials
@@ -99,80 +101,49 @@ function Import-Credentials {
         # create and return powershell credentials object 
         Write-Verbose "Importing credentials from $Path"
         $cred = Import-Clixml -Path $Path
-        return  New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $cred.Username, ($cred.Password | ConvertTo-SecureString)
+        return  New-Object -TypeName PSCredential -ArgumentList $cred.Username, ($cred.Password | ConvertTo-SecureString)
     } else {
         throw 'Credential file is not set. Please set credential file by calling script with parameter -SetCredentials'
     }
 }
 
 # AWS configuration object
-class AWSSettings {
-    [ValidateNotNullOrEmpty()][System.String]$AccessKey
-    [ValidateNotNullOrEmpty()][System.Security.SecureString]$SecretAccessKey
-    [ValidateNotNullOrEmpty()][System.String]$Region
+class AWSCredential {
+    [ValidateNotNullOrEmpty()][PSCredential]$Credential;
 
-    AWSSettings($_accessKey, $_secretAccessKey, $_region){
-        $this.AccessKey = $_accessKey
-        $this.SecretAccessKey = $_secretAccessKey | ConvertTo-SecureString -AsPlainText
-        $this.Region = $_region
+    AWSCredential([PSCredential]$_credential){
+        $this.Credential = $_credential
     }
 
-    # Convert object credentials to PSCredential object
-    [System.Management.Automation.PSCredential] ToPSCredential(){
-        return [System.Management.Automation.PSCredential]::new($this.AccessKey, $this.SecretAccessKey)
+    setEnv() {
+        $Env:AWS_ACCESS_KEY_ID=$this.Credential.UserName
+        $Env:AWS_SECRET_ACCESS_KEY=$this.Credential.Password | ConvertFrom-SecureString -AsPlainText
+    }
+
+    unsetEnv() {
+        Remove-Item Env:\AWS_ACCESS_KEY_ID
+        Remove-Item Env:\AWS_SECRET_ACCESS_KEY
     }
 }
 
 
-function Get-AWSSettings {
+function Get-AWSCustomCredential {
     <#
     .SYNOPSIS
-    `Get-AWSSettings` creates an custom AWS settings object with the provided settings.
+    `Get-AWSCustomCredential` creates an custom AWS credential object with the provided credentials.
     
-    .PARAMETER AccessKey
-    AWS access key of API user.
-    
-    .PARAMETER SecretKey
-    AWS secret key of API user.
-    
-    .PARAMETER Region
-    AWS region to use. Defaults to `us-east-1` or if present configured default location.
+    .PARAMETER Credential
+    AWS credentials. Access key as username and secret key as password
     
     .EXAMPLE
-    Get-AWSSettings -AccessKey "MyAccessKey" -SecretKey "MySecretKey" -Region us-east-1
+    Get-AWSCustomCredential -Credential (Get-Credental)
     
     #>
-    
-    #Requires -Module AWS.Tools.Common
     param (
-        # AWS Access key
-        [Parameter(Mandatory)]
-        [System.String]
-        $AccessKey,
-
-        # AWS Access key
-        [Parameter(Mandatory)]
-        [System.String]
-        $SecretKey,
-
-        # AWS region
-        [Parameter()]
-        [ValidateScript(
-            {
-                if (-Not (Get-AWSRegion -IncludeChina -IncludeGovCloud).Region.Contains($_)){
-                    throw "Region '$_' isn't a valid AWS region. (Eg. us-east-1)"
-                }
-                return $true
-            }
-        )]
-        [System.String]
-        $Region = 'us-east-1'
+        # Credential object containing AWS credentials.
+        [Parameter(ValueFromPipeline)]
+        [pscredential]
+        $Credential
     )
-    If ((Get-AWSRegion | Where-Object IsShellDefault -eq $true).Length -gt 0) {
-        Write-Verbose 'Found default region in AWS config.'
-        $Region = (Get-AWSRegion | Where-Object IsShellDefault -eq $true).Item(0).Region
-    }
-    Write-Verbose "Using AWS region $Region"
-
-    return [AWSSettings]::new($AccessKey, $SecretKey, $Region)
+    return [AWSCredential]::new($Credential)
 } 

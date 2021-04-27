@@ -66,15 +66,13 @@ Description = 'This module provides different functions, cmdlets and objects to 
 # FormatsToProcess = @()
 
 # Modules to import as nested modules of the module specified in RootModule/ModuleToProcess
-NestedModules = @(
-    'AWS.Tools.Common'
-)
+# NestedModules = @()
 
 # Functions to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no functions to export.
 FunctionsToExport = @(
     'Export-Credentials',
     'Import-Credentials',
-    'Get-AWSSettings'
+    'Get-AWSCustomCredential'
 )
 
 # Cmdlets to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no cmdlets to export.
