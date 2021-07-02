@@ -107,6 +107,28 @@ function Import-Credentials {
     }
 }
 
+function Get-CredentialFromFile {
+    param (
+        [Parameter(Mandatory)]
+        [string]
+        $Path
+    )
+
+    Write-Verbose "Check if $Path is present and of type leaf..."
+    # import credentials
+    if ( -Not (Test-Path -Path $Path -PathType Leaf)) {
+        throw "Path is not a valid Path of type Leaf."
+    }
+    try {
+        $Credential = Import-Credentials -Path $Path -ErrorAction Stop
+    } catch {
+        $err = $_
+        $message = "Can't import credentials from $Path`nError: $err"
+        throw $message
+    }
+    return $Credential
+}
+
 # AWS configuration object
 class AWSCredential {
     [ValidateNotNullOrEmpty()][PSCredential]$Credential;
@@ -117,7 +139,9 @@ class AWSCredential {
 
     setEnv() {
         $Env:AWS_ACCESS_KEY_ID=$this.Credential.UserName
-        $Env:AWS_SECRET_ACCESS_KEY=$this.Credential.Password | ConvertFrom-SecureString -AsPlainText
+        $plainTxt = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($this.Credential.Password))
+
+        $Env:AWS_SECRET_ACCESS_KEY=$plainTxt
     }
 
     unsetEnv() {
