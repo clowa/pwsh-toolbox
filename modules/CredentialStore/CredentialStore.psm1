@@ -1,13 +1,13 @@
 #using System.Management.Automation
 
 # create password file if it isn't present yet
-function Export-Credentials {
+function Export-Credential {
     <#
     .SYNOPSIS
-    The `Export-Credentials` save credentials encrypted to disk.
+    The `Export-Credential` save credentials encrypted to disk.
     
     .DESCRIPTION
-    The `Export-Credentials` cmdlet accepts a credential object and a path to save credentials to.
+    The `Export-Credential` cmdlet accepts a credential object and a path to save credentials to.
     
     .PARAMETER Credential
     PSCredential object to write to disk.
@@ -16,12 +16,23 @@ function Export-Credentials {
     Path to an .xml file. Credentials will be stored at this location. File must not yet exist.
     Defaults to: .\.Credentials.xml
     
+    .PARAMETER Key
+    Specifies the encryption key used to convert the original secure string into the encrypted standard string. Valid key lengths are 16, 24 and 32 bytes.
+
     .EXAMPLE
-    Export-Credentials -Path ./.secret.xml -Credential (Get-Credential)
+    Export-Credential -Path ./.secret.xml -Credential (Get-Credential)
 
     Description
     -----------
     Save credentials to file ./.secret.xml
+
+    .EXAMPLE
+    Export-Credential -Path ./.secret.xml -Credential (Get-Credential) -Key $(New-AESKey AES256)
+
+    Description
+    -----------
+    Save credentials to file ./.secret.xml with custom AES256 encryption key. This method allow encryption and decryption on other machines and other users.
+
     #>
     param(
         # input credential object
@@ -45,16 +56,24 @@ function Export-Credentials {
                 return $true
             })]
         [System.IO.FileInfo]
-        $Path = '.\.Credentials.xml'
+        $Path = '.\.Credentials.xml',
+
+        # AES key to decrypt data.
+        [Parameter()]
+        [Byte[]]
+        $Key
     )
 
     # checks if file already exists
     if (-Not (Test-Path -Path $Path -PathType Leaf)) {
         Write-Verbose "Exporting credentials to $Path"
         try {
-            New-Object -TypeName psobject -Property @{Username = $Credential.UserName; Password = $Credential.Password | ConvertFrom-SecureString } | Export-Clixml -Path $Path
+            $cred = New-Object -TypeName psobject -Property @{ Username = $Credential.UserName; Password = $Credential.Password | ConvertFrom-SecureString -Key $Key -ErrorAction Stop }
+            $cred | Export-Clixml -Path $Path -ErrorAction Stop
         } catch {
-            Remove-Item -Path $Path
+            $err = $_ 
+            Remove-Item -Path $Path -ErrorAction SilentlyContinue
+            throw $err
         }
     } else {
         throw 'Credential file exists. Delete file to set new credentials'
@@ -62,24 +81,33 @@ function Export-Credentials {
 }
 
 # set/import powershell credential object from file
-function Import-Credentials {
+function Import-Credential {
     <#
     .SYNOPSIS
-    The `Import-Credentials` imports credentials from xml file.
+    The `Import-Credential` imports credentials from xml file.
     
     .DESCRIPTION
-    The `Import-Credentials` cmdlet accepts a path to an .xml file to read encrypted credentials from. 
+    The `Import-Credential` cmdlet accepts a path to an .xml file to read encrypted credentials from. 
     
     .PARAMETER Path
     Path to an .xml file. Credentials will be read in from this location.
-    Defaults to: .\.Credentials.xml
+
+    .PARAMETER Key
+    Specifies the encryption key used to convert the original secure string into the encrypted standard string. Valid key lengths are 16, 24 and 32 bytes.
     
     .EXAMPLE
-    Import-Credentials -Path ./.secret.xml
+    Import-Credential -Path ./.secret.xml
 
     Description
     -----------
     Returns credentials as PSCredential object saved in file ./.secret.xml
+
+    .EXAMPLE
+    Import-Credential -Path ./.secret.xml -Key $key
+
+    Description
+    -----------
+    Returns credentials as PSCredential object saved in file ./.secret.xml. Decryption is done by custom AES key so file can be encrypt by other user and on other machine. 
     #>
     param(
         # path to store credentials
@@ -93,7 +121,12 @@ function Import-Credentials {
                 return $true
             })]
         [System.IO.FileInfo]
-        $Path = '.\.Credentials.xml'
+        $Path,
+
+        # AES key to decrypt data.
+        [Parameter()]
+        [Byte[]]
+        $Key
     )
     
     # checks if file exists
@@ -101,32 +134,10 @@ function Import-Credentials {
         # create and return powershell credentials object 
         Write-Verbose "Importing credentials from $Path"
         $cred = Import-Clixml -Path $Path
-        return  New-Object -TypeName PSCredential -ArgumentList $cred.Username, ($cred.Password | ConvertTo-SecureString)
+        return  New-Object -TypeName PSCredential -ArgumentList $cred.Username, ($cred.Password | ConvertTo-SecureString -Key $Key)
     } else {
-        throw 'Credential file is not set. Please set credential file by calling script with parameter -SetCredentials'
+        throw "Path is not valid. Make sure Path is present and of type leaf."
     }
-}
-
-function Get-CredentialFromFile {
-    param (
-        [Parameter(Mandatory)]
-        [string]
-        $Path
-    )
-
-    Write-Verbose "Check if $Path is present and of type leaf..."
-    # import credentials
-    if ( -Not (Test-Path -Path $Path -PathType Leaf)) {
-        throw "Path is not a valid Path of type Leaf."
-    }
-    try {
-        $Credential = Import-Credentials -Path $Path -ErrorAction Stop
-    } catch {
-        $err = $_
-        $message = "Can't import credentials from $Path`nError: $err"
-        throw $message
-    }
-    return $Credential
 }
 
 # AWS configuration object
@@ -171,3 +182,44 @@ function Get-AWSCustomCredential {
     )
     return [AWSCredential]::new($Credential)
 } 
+
+function New-AESKey {
+    <#
+    .SYNOPSIS
+    `New-AESKey` generates a AES encryption key.
+    
+    .PARAMETER Type
+    AES types (eg. AES256) 
+    
+    .EXAMPLE
+    New-AESKey -Type AES256
+    
+    #>
+    param (
+        [Parameter(Mandatory, Position=0)]
+        [ValidateSet(
+            "AES128",
+            "AES192",
+            "AES256"
+        )]
+        [string]
+        $Type
+    )
+    
+    switch ($Type) {
+        AES128 { 
+            $keyLength = 16
+         }
+        AES192 {
+            $keyLength = 24
+        }
+        AES256 {
+            $keyLength = 32
+        }
+    }
+
+    $AESKey = New-Object Byte[] $keyLength
+    [Security.Cryptography.RNGCryptoServiceProvider]::Create().GetBytes($AESKey)
+
+    return @($AESKey)
+}
