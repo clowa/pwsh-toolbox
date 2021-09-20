@@ -1,3 +1,6 @@
 # vs code stuff
 .vs/
 .devcontainer/
+
+# macOS stuff
+*DS_Store
