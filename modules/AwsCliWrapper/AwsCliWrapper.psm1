@@ -20,13 +20,27 @@ Function Install-AWSCLIV2 {
         [Parameter()]
         [System.String] $Version
     )
+
+    function Cleanup {
+        param (
+            [Parameter(Mandatory)]
+            [String] $Dir
+        )
+        if (-Not ($Dir | Test-Path)) {
+            return $false
+        }
+        Write-Verbose 'Cleanup...'
+        Remove-Item -Path $Dir -Recurse
+        return $true
+    }
+    
     [uri] $winUri = 'https://awscli.amazonaws.com/AWSCLIV2.msi'
     [uri] $linuxUri = 'https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip'
     [uri] $macUri = 'https://awscli.amazonaws.com/AWSCLIV2.pkg'
 
     # set uri based on os
-    if ($IsWindows) {
-        Write-Verbose 'Windows detected'
+    if($IsWindows -Or $PSVersionTable.PSEdition -Eq "Desktop") {
+        Write-Verbose 'Windows detected (Core / Desktop)'
         [uri] $uri = $winUri
     } elseif ($IsLinux) {
         Write-Verbose 'Linux detected'
@@ -34,7 +48,10 @@ Function Install-AWSCLIV2 {
     } elseif ($IsMacOS) {
         Write-Verbose 'macOS detected'
         [uri] $uri = $macUri
-    }
+    } else {
+        Write-Warning "Operation system not detected"
+        exit 1
+    } 
 
     if (-Not [System.String]::IsNullOrEmpty($Version)) {
         Write-Verbose "Create uri for Version $Version"
@@ -46,19 +63,21 @@ Function Install-AWSCLIV2 {
         $uri = New-Object -TypeName Uri -ArgumentList ($uri, $filenameVersion)
         Write-Verbose "New uri: $uri"
     }
+
     Write-Verbose 'Create temp directory...'
     $guid = New-Guid
-    if ($IsWindows){
-        $tmpFolder = New-Item -ItemType Directory -Path (Join-Path -Path $env:TMP -ChildPath $guid)
-    } else {
+    if ($IsLinux -or $IsMacOS) {
         $tmpFolder = New-Item -ItemType Directory -Path (Join-Path -Path $env:TMPDIR -ChildPath $guid)
+    } else {
+        $tmpFolder = New-Item -ItemType Directory -Path (Join-Path -Path $env:TEMP -ChildPath $guid)
     }
     
 
     Write-Verbose "Downloading from $uri"
     $file = Get-WebFile -Url $uri -Path $tmpFolder
     Write-Verbose "Stored file at $($file.Fullname)"
-    if ($IsWindows) {
+    
+    if($IsWindows -Or $PSVersionTable.PSEdition -Eq "Desktop") {
         Write-Verbose 'Started windows installation process.'
         Write-Verbose "Start .msi`t$file /quiet"
         Start-Process msiexec.exe -Wait -ArgumentList "/I $file /quiet"
@@ -76,7 +95,8 @@ Function Install-AWSCLIV2 {
         Write-Verbose 'Started macOS installation process.'
         Invoke-Command -ScriptBlock { sudo installer -pkg $file.FullName -target / }
     } else {
-        Write-Verbose 'Unknown operating system.'
+        Write-Warning "Operation system not detected"
+        Cleanup -Dir $tmpFolder
     }
 
     Write-Verbose 'Verify installation'
@@ -100,8 +120,7 @@ Function Install-AWSCLIV2 {
     } catch {
         throw 'Failed to install AWS cli.'
     } finally {
-        Write-Verbose 'Cleanup...'
-        Remove-Item -Path $tmpFolder -Recurse
+        Cleanup -Dir $tmpFolder
     }
 }
 
@@ -223,12 +242,22 @@ function Get-WebFile {
             })]
         [System.IO.DirectoryInfo] $Path
     )
+    
     $fileName = Split-Path -Path $Url -Leaf
     if ($null -ne $Path) {
         [System.IO.FileInfo] $localLocation = Join-Path -Path $Path -ChildPath $fileName
     } else {
-        [System.IO.FileInfo] $localLocation = Join-Path -Path $Env:TMPDIR -ChildPath $fileName
+        if ($IsWindows){
+            $tmpFolder = $env:TEMP
+        } else {
+            $tmpFolder = $env:TMPDIR
+        }
+
+        [System.IO.FileInfo] $localLocation = Join-Path -Path $tmpFolder -ChildPath $fileName
     }
+    Write-Verbose "Set TLS to v 1.1 and 1.2"
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]'Tls11,Tls12'
+    
     Invoke-WebRequest -Uri $Url -OutFile $localLocation.FullName
     return $localLocation
 }
