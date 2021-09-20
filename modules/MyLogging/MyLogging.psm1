@@ -213,16 +213,10 @@ function Send-AWSCLISESEmail {
         $AWSRegion
     )
 
-    # * Could be removed if ValidateNotNullOrEmpty is working correctly
-    if ($Message.Length -eq 0) {
-        return
-    }
-
     $messageIDs = New-Object -TypeName 'System.Collections.Generic.List[String]'
     # send email to each recipient in array
     foreach ($_email in $Emails) {
         Write-Verbose "Send email from $From to $_email"
-        Write-Verbose "Message length: $($Message.Length)"
 
         # Set AWS CLI env vars
         if($AWSCredential) {
