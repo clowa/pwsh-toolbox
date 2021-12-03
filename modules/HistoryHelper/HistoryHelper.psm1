@@ -1,6 +1,8 @@
 ###
 # History
 ###
+$env:historyPath = (Get-PSReadLineOption).HistorySavePath
+
 function Get-FullHistory () {
     Get-Content -Path (Get-PSReadLineOption).HistorySavePath
 }
