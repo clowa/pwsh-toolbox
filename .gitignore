@@ -2,5 +2,13 @@
 .vs/
 .devcontainer/
 
+# Ingore logs
+*.log
+logs/*
+
+# Ignore archived files
+*.bak
+*.old
+
 # macOS stuff
 *DS_Store
