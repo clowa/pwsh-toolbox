@@ -6,12 +6,12 @@ function Get-EKSToken {
         $Clustername = $((Select-String -Pattern 'current-context: (.*)$' -Path $HOME/.kube/config).Matches.Groups[1].Value),
         #! The following regex can lead to "' doesn't match a supported format" if ~/.aws/config is formated with CFLF. Solution is to store file with LF.
         $Region = $((Get-Content -Raw -Path $HOME/.aws/config | Select-String -Pattern '\[default\]\s*\r\n?|\nregion\s*=\s(.*)').Matches.Groups[1].Value),
-        $ProfileAWS = "default",
+        $ProfileAWS = $( if (-Not $env:AWS_PROFILE) { return $env:AWS_PROFILE } else { return "default" } ),
         [Switch] $PassThru,
         [Switch] $Raw
     )
 
-    $response = aws eks get-token --cluster-name "$Clustername" --region "$Region" --profile "$ProfileAWS" | ConvertFrom-Json
+    $response = Invoke-Expression "aws eks get-token --cluster-name `"$Clustername`" --region `"$Region`" --profile `"$ProfileAWS`"" | ConvertFrom-Json
 
     if ($Raw) {
         $result = $response
