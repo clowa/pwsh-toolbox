@@ -119,6 +119,11 @@ Function Copy-AzSqlInstanceDatabaseViaPointInTimeBackup {
         -Name $source.InstanceName
     $sourceDatabase = $sourceInstance | Get-AzSqlInstanceDatabase -Name $source.DatabaseName
 
+    if (-Not $?) {
+        Write-Error "Database `"$($source.DatabaseName)`" does not exist on `"$($source.InstanceName)`"."
+        exit 1
+    }
+
     $BackupAgeInMinutes = $BackupAgeInMinutes * -1
 
     # Checking if the target time is older than the earliest restore point available on the source database.
