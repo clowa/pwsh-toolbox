@@ -1,3 +1,79 @@
+function Get-AzStorageContainerStats {
+    param (
+        [Parameter(
+            Mandatory = $true,
+            ValueFromPipeline = $true
+        )]
+        [Microsoft.WindowsAzure.Commands.Common.Storage.ResourceModel.AzureStorageContainer]
+        $Container
+    )
+
+    begin {}
+
+    process {
+        $blob_continuation_token = $null
+
+        $total_blob_count = 0
+        $total_usage = 0
+        $soft_delete_count = 0
+        $soft_delete_usage = 0
+        $snapshot_count = 0
+        $snapshot_usage = 0
+        $version_count = 0
+        $version_usage = 0
+
+        do {
+            $blobs = $Container | Get-AzStorageBlob -IncludeDeleted -IncludeVersion -ConcurrentTaskCount 100 -MaxCount 5000 -ContinuationToken $blob_continuation_token 
+            $blob_continuation_token = $null
+            
+            if ($blobs -ne $null) {
+                $blob_continuation_token = $blobs[$blobs.Count - 1].ContinuationToken
+              
+                for ([int] $b = 0; $b -lt $blobs.Count; $b++) {
+                    $total_blob_count++
+                    $total_usage += $blobs[$b].Length
+                
+                    if ($blobs[$b].IsDeleted) {
+                        $soft_delete_count++
+                        $soft_delete_usage += $blobs[$b].Length
+                    }
+                
+                    if ($blobs[$b].SnapshotTime -ne $null) {
+                        $snapshot_count++
+                        $snapshot_usage += $blobs[$b].Length
+                    }
+                
+                    if ($blobs[$b].VersionId -ne $null) {
+                        $version_count++
+                        $version_usage += $blobs[$b].Length
+                    }
+                }
+              
+                if ($blob_continuation_token -ne $null) {
+                    Write-Verbose ("Blob listing continuation token = {0}" -f $blob_continuation_token.NextMarker)
+                }
+            }
+        } while ($blob_continuation_token -ne $null)
+          
+        return [PSCustomObject] @{ 
+            Name                     = $Container.Name
+            StorageAccountName       = $Container.Context.StorageAccountName
+            TotalBlobCount           = $total_blob_count 
+            TotalBlobUsageinGB       = $total_usage / 1GB
+            SoftDeletedBlobCount     = $soft_delete_count
+            SoftDeletedBlobUsageinGB = $soft_delete_usage / 1GB
+            SnapshotCount            = $snapshot_count
+            SnapshotUsageinGB        = $snapshot_usage / 1GB
+            VersionCount             = $version_count
+            VersionUsageinGB         = $version_usage / 1GB
+        }
+    }
+
+    end {}
+    
+}
+
+
 Function Restore-AzureDeletedBlob {
     [CmdletBinding()]
     param (
