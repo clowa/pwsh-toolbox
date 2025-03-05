@@ -255,3 +255,116 @@ Function Copy-AzSqlInstanceDatabaseViaPointInTimeBackup {
         exit 1
     }
 }
+
+# Function to retrieve all principals assigned to a given Azure AD role via Microsoft Graph API.
+function Get-AzureEntraIdRoleAssignments {
+    param (
+        [Parameter(
+            Position = 0,
+            Mandatory = $true
+        )]
+        [String[]] $EntraIdRoles
+    )
+    
+    Invoke-MgRestMethod -Method GET -Uri https://graph.microsoft.com/v1.0/directoryRoles |
+    Select-Object -ExpandProperty value |
+    Where-Object -Property displayName -In $EntraIdRoles |
+    ForEach-Object {
+        $role = $_
+        $roleMembers = Invoke-MgRestMethod -Method GET -Uri https://graph.microsoft.com/v1.0/directoryRoles/$($role.id)/members
+        $roleMembers.value | ForEach-Object {
+            $member = $_
+            if ($member.'@odata.type' -eq '#microsoft.graph.user') {
+                $identity = Invoke-MgRestMethod -Method GET -Uri "https://graph.microsoft.com/v1.0/users/$($member.id)?`$select=id,accountEnabled" |
+                Add-Member -MemberType NoteProperty -Name type -Value "#microsoft.graph.user" -PassThru
+            } elseif ($member.'@odata.type' -eq '#microsoft.graph.group') {
+                $identity = Invoke-MgRestMethod -Method GET -Uri "https://graph.microsoft.com/v1.0/groups/$($member.id)" |
+                Add-Member -MemberType NoteProperty -Name accountEnabled -Value $true -PassThru | 
+                Add-Member -MemberType NoteProperty -Name type -Value "#microsoft.graph.group" -PassThru
+            }
+  
+            [PSCustomObject]@{
+                Role              = $role.displayName
+                RoleId            = $role.id
+                RoleMember        = $identity.displayName
+                RoleMemberId      = $identity.id
+                RoleMemberType    = $identity.type
+                RoleMemberEnabled = $identity.accountEnabled
+            }
+        }
+    }
+}
+  
+# Function to retrieve all azure role assignments via Azure Resource Graph.
+# This function used pagination to retrieve all role assignments.
+function Get-AzureRbacAllRoleAssignments {
+    $query = @"
+authorizationresources
+| where type == "microsoft.authorization/roleassignments"
+| extend roleDefinitionId = tostring(properties.roleDefinitionId)
+| extend shortRoleDefinitionId = split(roleDefinitionId, "/")[array_length(split(roleDefinitionId, "/")) - 1]
+| extend principalType = tostring(properties.principalType)
+| extend principalId = tostring(properties.principalId)
+| extend scope = tostring(properties.scope)
+| join kind=leftouter (
+authorizationresources
+| where type == "microsoft.authorization/roledefinitions"
+| extend roleDefinitionId = tostring(id)
+| extend roleDefinitionName = tostring(properties.roleName)
+) on roleDefinitionId
+| project principalId, principalType, shortRoleDefinitionId, roleDefinitionName, scope
+"@
+  
+    $skipToken = $null
+  
+    do {
+        $result = Search-AzGraph -UseTenantScope -Query $query -First 1000 -SkipToken $skipToken
+        $skipToken = $result.SkipToken
+  
+        # Stream each result directly into the pipeline
+        $result.Data | ForEach-Object { return $_ }
+    } while ($skipToken)
+}
+
+# Function to retrieve principal information form Microsoft Graph API
+function Get-AzurePrincipal {
+    [CmdletBinding()]
+    param (
+        [Parameter(
+            Position = 0,
+            Mandatory = $true,
+            ValueFromPipelineByPropertyName = $true
+        )]
+        [string]$PrincipalId,
+  
+        [Parameter(
+            Position = 1,
+            Mandatory = $true,
+            ValueFromPipelineByPropertyName = $true
+        )]
+        [ValidateSet("User", "Group", "ForeignGroup", "ServicePrincipal")]
+        [string]$PrincipalType
+    )
+  
+    process {
+        switch ($PrincipalType) {
+            "User" {
+                $principal = Get-MgUser -UserId $PrincipalId -Property Id, DisplayName, AccountEnabled
+                break
+            }
+            { "Group" -or "ForeignGroup" } {
+                $principal = Get-MgGroup -GroupId $PrincipalId
+                break
+            }
+            "ServicePrincipal" {
+                $principal = Get-MgServicePrincipal -ServicePrincipalId $PrincipalId
+                break
+            }
+            default {
+                return "Unknown Principal Type"
+            }
+        }
+  
+        return $principal
+    }
+}
